@@ -7,7 +7,7 @@
 // i.e. (len)/n (for linear sliders) or (degrees)/n (for rotary encoders).
 
 // Set type of capacitive input device (0 = linear, 1 for rotary)
-#define TYPE 1
+#define TYPE 0
 
 Adafruit_MPR121 cap = Adafruit_MPR121();
 // Stores min, max, & current capacitance.
@@ -39,7 +39,7 @@ void setup() {
     segmentLen = 360.0 / NUMCAPS;
   }
   
-  // Calibration time (2s) - move slider/knob as much as possible!
+  // Calibration time (2s)
   unsigned long setupStart = millis();
   Serial.println("Starting calibration (2 seconds). Move the slider or knob as much as possible!");
   while(millis() - setupStart < 2000) {
@@ -60,23 +60,23 @@ void loop() {
     channelRatios[i] = getRatio(i);
     
       // Debugging (Prints each channel's min, current, max)
-//    Serial.print("Channel ");
-//    Serial.print( i );
-//    Serial.print(" : ");
-//    Serial.print(channelMinMax[i * 3]);
-//    Serial.print(" / ");
-//    Serial.print(channelMinMax[i * 3 + 1]);
-//    Serial.print(" / ");
-//    Serial.print(channelMinMax[i * 3 + 2]);
-//    Serial.print("  ");
-//    Serial.println();
-
-    // Debugging (Prints each channel's ratio)
-    Serial.print("Ratio ");
+    Serial.print("Channel ");
     Serial.print( i );
     Serial.print(" : ");
-    Serial.print(channelRatios[i]);
+    Serial.print(channelMinMax[i * 3]);
+    Serial.print(" / ");
+    Serial.print(channelMinMax[i * 3 + 1]);
+    Serial.print(" / ");
+    Serial.print(channelMinMax[i * 3 + 2]);
+    Serial.print("  ");
     Serial.println();
+
+    // Debugging (Prints each channel's ratio)
+//    Serial.print("Ratio ");
+//    Serial.print( i );
+//    Serial.print(" : ");
+//    Serial.print(channelRatios[i]);
+//    Serial.println();
   }
   
   // Finding Location
