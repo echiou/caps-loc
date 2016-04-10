@@ -1,13 +1,15 @@
 #include <Wire.h>
+#include <Adafruit_NeoPixel.h>
+#include <math.h>
 #include "Adafruit_MPR121.h"
 
 // Put n = number of capacitors here, n > 1.
-#define NUMCAPS 4
+#define NUMCAPS 3
 // This code assumes that you are using a dielectric the same size of the capacitors,
-// i.e. (len)/n (for linear sliders) or (degrees)/n (for rotary encoders).
 
-// Set type of capacitive input device (0 = linear, 1 for rotary)
-#define TYPE 0
+// Put m = number of neopixels here.
+#define NUMNEOPIXELS 16
+#define NEOPIXELPIN 6
 
 Adafruit_MPR121 cap = Adafruit_MPR121();
 // Stores min, max, & current capacitance.
@@ -15,8 +17,10 @@ int channelMinMax[NUMCAPS * 3];
 double channelRatios[NUMCAPS];
 double segmentLen;
 
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMNEOPIXELS, NEOPIXELPIN, NEO_GRB + NEO_KHZ800);
+
 void setup() {
-  while (!Serial);        // needed to keep leonardo/micro from starting too fast!
+  while (!Serial); // needed to keep leonardo/micro from starting too fast!
   Serial.begin(9600);
   
   // Default address is 0x5A, if tied to 3.3V its 0x5B
@@ -33,11 +37,7 @@ void setup() {
   }
   
   // Set the segment lengths
-  if (TYPE == 0) { // linear
-    segmentLen = 100.0 / (NUMCAPS - 1);
-  } else { // rotary
-    segmentLen = 360.0 / NUMCAPS;
-  }
+  segmentLen = 360.0 / NUMCAPS;
   
   // Calibration time (2s)
   unsigned long setupStart = millis();
@@ -48,6 +48,9 @@ void setup() {
     }
   }
   Serial.println("Finished calibration.");
+  
+  strip.begin();
+  strip.show(); // Initialize all pixels to 'off'
 }
 
 void loop() {
@@ -56,27 +59,7 @@ void loop() {
   for (int i = 0; i < NUMCAPS; i++ ) {
     readAndCalibrate(i);
     
-
     channelRatios[i] = getRatio(i);
-    
-      // Debugging (Prints each channel's min, current, max)
-    Serial.print("Channel ");
-    Serial.print( i );
-    Serial.print(" : ");
-    Serial.print(channelMinMax[i * 3]);
-    Serial.print(" / ");
-    Serial.print(channelMinMax[i * 3 + 1]);
-    Serial.print(" / ");
-    Serial.print(channelMinMax[i * 3 + 2]);
-    Serial.print("  ");
-    Serial.println();
-
-    // Debugging (Prints each channel's ratio)
-//    Serial.print("Ratio ");
-//    Serial.print( i );
-//    Serial.print(" : ");
-//    Serial.print(channelRatios[i]);
-//    Serial.println();
   }
   
   // Finding Location
@@ -102,48 +85,36 @@ void loop() {
   
   // Use locations to get index.
   double loc;
-  if (TYPE == 0) { // linear
-    if (largestIndex < secondIndex) { //adjust from above largest index.
-      double center = segmentLen * (largestIndex + 0.5);
-      loc = center - (largestValue - secondValue) / largestValue * (segmentLen / 2);
-    } else { //adjust from below largest index.
-      double center = segmentLen * (largestIndex - 0.5);
-      loc = center + (largestValue - secondValue) / largestValue * (segmentLen / 2);
-    }
-  } else { // rotary
-    if (largestIndex == 0 && secondIndex == NUMCAPS - 1) {
-      // Edge case, between capacitor 0 & last (closer to 0)
-      double center = 0;
-      loc = center + (largestValue - secondValue) / largestValue * (segmentLen / 2);
-    } else if (secondIndex == 0 && largestIndex == NUMCAPS - 1) {
-      // Edge case, between capacitor 0 & last (closer to last)
-      double center = 360;
-      loc = center - (largestValue - secondValue) / largestValue * (segmentLen / 2);
-    } else if (largestIndex < secondIndex) { //adjust from in front of largest index.
-      double center = segmentLen * (largestIndex + 1);
-      loc = center - (largestValue - secondValue) / largestValue * (segmentLen / 2);
-    } else { //adjust from below largest index.
-      double center = segmentLen * (largestIndex);
-      loc = center + (largestValue - secondValue) / largestValue * (segmentLen / 2);
-    }
+  if (largestIndex == 0 && secondIndex == NUMCAPS - 1) {
+    // Edge case, between capacitor 0 & last (closer to 0)
+    double center = 0;
+    loc = center + (largestValue - secondValue) / largestValue * (segmentLen / 2);
+  } else if (secondIndex == 0 && largestIndex == NUMCAPS - 1) {
+    // Edge case, between capacitor 0 & last (closer to last)
+    double center = 360;
+    loc = center - (largestValue - secondValue) / largestValue * (segmentLen / 2);
+  } else if (largestIndex < secondIndex) { //adjust from in front of largest index.
+    double center = segmentLen * (largestIndex + 1);
+    loc = center - (largestValue - secondValue) / largestValue * (segmentLen / 2);
+  } else { //adjust from below largest index.
+    double center = segmentLen * (largestIndex);
+    loc = center + (largestValue - secondValue) / largestValue * (segmentLen / 2);
   }
   
   Serial.print("Detected at location: ");
   Serial.print(loc);
-  if (TYPE == 0) { // linear
-    Serial.print(" out of 100");
-  } else { // rotary
-    Serial.print(" degrees");
-  }
-  Serial.println(); 
+  Serial.print(" degrees");
+  Serial.println();
   
-  // One reading every half second.
-  delay(250);
+  singlePositionWhite(loc, 2);
+  strip.show();
+  
+  // One reading every 0.1 second.
+  delay(50);
 }
 
 void readAndCalibrate(int i) {
   int curData = cap.filteredData(i);
-
   if (curData != 0) {
     if (channelMinMax[i * 3] > curData) { // new Min
       channelMinMax[i * 3] = curData;
@@ -162,5 +133,26 @@ double getRatio(int i) {
   }
   double ratio = double(channelMinMax[i * 3 + 1] - channelMinMax[i * 3]) / diffMaxMin;
   return 1 - ratio; // Invert, so higher number when blocked.
+}
+
+// Parameter 1 pos = position of slider (double out of 100).
+// Parameter 2 numPixels = number of pixels on either side to turn on (faded).
+// Parameter 3 color = color of pixel.
+void singlePositionWhite(double pos, int numPixels) {
+  int posScaled = (int) (pos / 360 * NUMNEOPIXELS);
+ 
+  // Debugging (lights on) 
+//  Serial.print("Lighting up pixel ");
+//  Serial.print(posScaled);
+//  Serial.println();
+  
+  for (int i=0; i < NUMNEOPIXELS; i++) {
+    int posDiff = posScaled - numPixels;
+    if (i == posScaled){
+      strip.setPixelColor(15 - i, strip.Color(100, 100, 100));
+    } else {
+      strip.setPixelColor(15 - i, 0);
+    }
+  }
 }
 

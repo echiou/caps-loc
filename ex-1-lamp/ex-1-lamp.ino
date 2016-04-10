@@ -4,11 +4,11 @@
 #include "Adafruit_MPR121.h"
 
 // Put n = number of capacitors here, n > 1.
-#define NUMCAPS 3
+#define NUMCAPS 4
 // This code assumes that you are using a dielectric the same size of the capacitors,
 
 // Put m = number of neopixels here.
-#define NUMNEOPIXELS 41
+#define NUMNEOPIXELS 40
 #define NEOPIXELPIN 6
 
 Adafruit_MPR121 cap = Adafruit_MPR121();
@@ -70,8 +70,8 @@ void loop() {
   int secondIndex = -1;
   double secondValue = -1;
   for (int i = 0; i < NUMCAPS; i++) {
-    if (channelRatios[i] > secondValue) {
-      if (channelRatios[i] > largestValue) {
+    if (channelRatios[i] >= secondValue) {
+      if (channelRatios[i] >= largestValue) {
         secondIndex = largestIndex;
         secondValue = largestValue;
         largestIndex = i;
